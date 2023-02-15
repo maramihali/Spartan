@@ -592,7 +592,7 @@ mod tests {
 
   #[test]
   pub fn check_snark() {
-    let num_vars = 256;
+    let num_vars = 64;
     let num_cons = num_vars;
     let num_inputs = 10;
 

@@ -8,6 +8,7 @@ use super::random::RandomTape;
 use super::scalar::Scalar;
 use super::transcript::{AppendToTranscript, ProofTranscript};
 use core::ops::Index;
+use curve25519_dalek::traits::IsIdentity;
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
 
@@ -147,6 +148,20 @@ impl DensePolynomial {
   #[cfg(feature = "multicore")]
   fn commit_inner(&self, blinds: &[Scalar], gens: &MultiCommitGens) -> PolyCommitment {
     let L_size = blinds.len();
+    blinds
+      .iter()
+      .inspect(|e| assert_eq!((**e), Scalar::zero(), "scalars are zero"));
+
+    gens
+      .G
+      .iter()
+      .inspect(|e| assert!(!e.is_identity(), "generators are zero"));
+
+    let evals = &self.Z;
+    evals
+      .iter()
+      .inspect(|e| assert_eq!((**e), Scalar::zero(), "evaluations are zero"));
+
     let R_size = self.Z.len() / L_size;
     assert_eq!(L_size * R_size, self.Z.len());
     let C = (0..L_size)
@@ -156,6 +171,7 @@ impl DensePolynomial {
           .commit(&blinds[i], gens)
           .compress()
       })
+      .inspect(|e| assert!(!e.is_identity(), "commitments are zero"))
       .collect();
     PolyCommitment { C }
   }
@@ -163,6 +179,21 @@ impl DensePolynomial {
   #[cfg(not(feature = "multicore"))]
   fn commit_inner(&self, blinds: &[Scalar], gens: &MultiCommitGens) -> PolyCommitment {
     let L_size = blinds.len();
+
+    blinds
+      .iter()
+      .inspect(|e| assert_eq!((**e), Scalar::zero(), "scalars are zero"));
+
+    gens
+      .G
+      .iter()
+      .inspect(|e| assert!(!e.is_identity(), "generators are zero"));
+
+    let evals = &self.Z;
+    evals
+      .iter()
+      .inspect(|e| assert_eq!((**e), Scalar::zero(), "evaluations are zero"));
+
     let R_size = self.Z.len() / L_size;
     assert_eq!(L_size * R_size, self.Z.len());
     let C = (0..L_size)
@@ -171,6 +202,7 @@ impl DensePolynomial {
           .commit(&blinds[i], gens)
           .compress()
       })
+      .inspect(|e| assert!(!e.is_identity(), "commitments are zero"))
       .collect();
     PolyCommitment { C }
   }
@@ -376,7 +408,11 @@ impl PolyEvalProof {
     let (L, R) = eq.compute_factored_evals();
 
     // compute a weighted sum of commitments and L
-    let C_decompressed = comm.C.iter().map(|pt| pt.decompress().unwrap());
+    let C_decompressed = comm
+      .C
+      .iter()
+      .map(|pt| pt.decompress().unwrap())
+      .inspect(|e| assert!(!e.is_identity(), "commitment in verify is zero"));
 
     let C_LZ = GroupElement::vartime_multiscalar_mul(&L, C_decompressed).compress();
 
